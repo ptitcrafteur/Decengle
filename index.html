@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Decengle</title>
+    <link rel="stylesheet" href="./Style/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Decengle</h1>
+      <div id="status-bar">
+        <span id="peer-count">0 peers</span>
+        <span id="connection-status" class="status-idle">Idle</span>
+      </div>
+    </header>
+
+    <main>
+      <div id="video-container">
+        <div class="video-box">
+          <video id="local-video" autoplay playsinline muted></video>
+          <span class="video-label">You</span>
+        </div>
+        <div class="video-box">
+          <video id="remote-video" autoplay playsinline></video>
+          <span class="video-label">Stranger</span>
+          <div id="waiting-overlay">
+            <p>Waiting for someone...</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="controls">
+        <button id="btn-start" class="btn btn-primary">Start</button>
+        <button id="btn-next" class="btn btn-warning" disabled>Next</button>
+        <button id="btn-stop" class="btn btn-danger" disabled>Stop</button>
+      </div>
+
+      <div id="chat-container">
+        <div id="chat-messages"></div>
+        <form id="chat-form">
+          <input
+            type="text"
+            id="chat-input"
+            placeholder="Type a message..."
+            autocomplete="off"
+            disabled
+          />
+          <button type="submit" id="btn-send" class="btn" disabled>Send</button>
+        </form>
+      </div>
+
+      <details id="bootstrap-settings">
+        <summary>Bootstrap Nodes</summary>
+        <div class="bootstrap-add">
+          <input
+            type="text"
+            id="bootstrap-input"
+            placeholder="ws://host:port"
+            autocomplete="off"
+          />
+          <button type="button" id="btn-add-bootstrap" class="btn btn-primary">Add</button>
+        </div>
+        <ul id="bootstrap-list"></ul>
+      </details>
+    </main>
+
+    <script src="./Scripts/crypto.js"></script>
+    <script src="./Scripts/state.js"></script>
+    <script src="./Scripts/webrtc.js"></script>
+    <script src="./Scripts/dht.js"></script>
+    <script src="./Scripts/matching.js"></script>
+    <script src="./Scripts/chat.js"></script>
+    <script src="./Scripts/app.js"></script>
+  </body>
+</html>
