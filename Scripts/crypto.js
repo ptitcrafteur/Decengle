@@ -1,5 +1,8 @@
 // crypto.js — Key generation, peer ID, and E2EE (ECDH + AES-GCM)
 // Falls back to random IDs when crypto.subtle is unavailable (file:// protocol)
+// TODO(security): Warn the user visibly when running in fallback mode (no real encryption)
+// TODO(security): Add key rotation — periodically renegotiate ECDH keys during long conversations
+// TODO(security): Add SAS (Short Authentication String) verification to confirm peer identity
 
 window.Decengle = window.Decengle || {};
 
@@ -61,6 +64,7 @@ Decengle.encrypt = async function (sharedKey, plaintext) {
 
 // Decrypt { iv, ct } → plaintext string
 Decengle.decrypt = async function (sharedKey, encryptedMsg) {
+  // TODO(security): Remove plaintext fallback — if E2EE fails, messages should not be sent unencrypted
   if (!hasSubtle || !sharedKey || encryptedMsg._plain) {
     return encryptedMsg._plain ? encryptedMsg.text : null;
   }
@@ -73,6 +77,8 @@ Decengle.decrypt = async function (sharedKey, encryptedMsg) {
 };
 
 Decengle.generatePeerId = async function (publicKeyHex) {
+  // TODO(security): Add a random salt to the peer ID to prevent cross-session tracking
+  //   (currently the same public key always produces the same peer ID)
   if (hasSubtle) {
     const data = Decengle.hexToBuf(publicKeyHex);
     const hash = await crypto.subtle.digest("SHA-256", data);

@@ -1,11 +1,16 @@
 // webrtc.js — WebRTC connection manager
 // Manages peer connections (data channels + media streams)
+// TODO(networking): Add TURN server support as fallback for symmetric NAT (configure via UI or env)
+// TODO(robustness): Add connection timeout — close connections stuck in "connecting" state after N seconds
+// TODO(networking): Add bandwidth estimation and adaptive video quality (lower resolution on bad connections)
 
 window.Decengle = window.Decengle || {};
 
 const ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
+  // TODO(networking): Add configurable TURN servers for NAT traversal behind symmetric NAT
+  // TODO(networking): Let users add custom STUN/TURN servers from the UI
 ];
 
 class PeerConnection {
@@ -36,6 +41,8 @@ class PeerConnection {
 
     this.pc.onconnectionstatechange = () => {
       const state = this.pc.connectionState;
+      // TODO(robustness): Attempt ICE restart before closing on "disconnected" state
+      // TODO(ux): Emit connection quality events ("excellent", "poor", "reconnecting") via getStats()
       if (state === "disconnected" || state === "failed" || state === "closed") {
         this.close();
       }

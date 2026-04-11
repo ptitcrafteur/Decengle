@@ -5,6 +5,12 @@ const PORT = process.env.PORT || 9000;
 const SELF_URL = process.env.SELF_URL || null; // e.g. "wss://decengle.example.com"
 const PEER_BOOTSTRAPS = (process.env.PEER_BOOTSTRAPS || "").split(",").filter(Boolean);
 
+// TODO(security): Add rate limiting per IP (e.g. max messages/sec) to prevent DoS
+// TODO(security): Validate message schemas before processing (reject malformed payloads)
+// TODO(security): Add max connections per IP to prevent resource exhaustion
+// TODO(robustness): Add structured logging with levels (debug/info/warn/error) instead of console.log
+// TODO(robustness): Add graceful shutdown handler (SIGTERM) to close connections cleanly
+
 const wss = new WebSocketServer({ port: PORT });
 
 // ── Bootstrap's own DHT identity ───────────────────────────────
@@ -18,6 +24,8 @@ const peers = new Map();
 
 // ── DHT store ──────────────────────────────────────────────────
 const dhtStore = new Map();
+// TODO(security): Add a max size cap for dhtStore (e.g. 10,000 entries) to prevent memory exhaustion
+// TODO(robustness): Persist DHT store to disk (e.g. SQLite) so data survives server restarts
 
 dhtStore.set(bootstrapId, {
   value: { peerId: bootstrapId, state: "idle", lastSeen: Date.now() },
@@ -29,6 +37,7 @@ const knownBootstraps = new Set(PEER_BOOTSTRAPS);
 if (SELF_URL) knownBootstraps.add(SELF_URL);
 
 // ── Periodic cleanup of stale DHT entries (>60s) ───────────────
+// TODO(networking): Make expiration time configurable via env var
 setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of dhtStore) {
@@ -45,6 +54,8 @@ function connectToBootstrapPeer(url) {
   if (!url || url === SELF_URL) return;
   if (bootstrapPeers.has(url)) return;
 
+  // TODO(security): Validate bootstrap URL format before connecting (prevent SSRF)
+  // TODO(networking): Add mutual authentication between bootstrap nodes
   console.log(`[Bootstrap] Connecting to peer bootstrap: ${url}`);
   const peerWs = new WebSocket(url);
   bootstrapPeers.set(url, peerWs);
@@ -199,6 +210,8 @@ wss.on("connection", (ws) => {
       }
 
       case "dht-store": {
+        // TODO(security): Validate that msg.key matches the peer's actual ID to prevent impersonation
+        // TODO(security): Limit value size (e.g. max 1KB) to prevent storage abuse
         if (msg.key && msg.value !== undefined) {
           dhtStore.set(msg.key, {
             value: msg.value,
@@ -233,6 +246,8 @@ wss.on("connection", (ws) => {
       }
 
       case "signal": {
+        // TODO(security): Verify that the sender (peerId) actually owns the connection sending this message
+        // TODO(networking): Add TURN server relay as fallback when direct P2P fails (symmetric NAT)
         const target = peers.get(msg.to);
         if (target && target.ws.readyState === 1) {
           target.ws.send(JSON.stringify({
@@ -254,6 +269,11 @@ wss.on("connection", (ws) => {
   ws.on("close", () => removePeer(peerId));
   ws.on("error", () => removePeer(peerId));
 });
+
+// TODO(networking): Add health check endpoint (HTTP GET /health) for monitoring
+// TODO(networking): Add clustering support (multiple workers) for higher throughput
+// TODO(networking): Add WebSocket compression (permessage-deflate) for bandwidth savings
+// TODO(robustness): Add metrics collection (connected peers, messages/sec, DHT size)
 
 function removePeer(id) {
   if (!id || !peers.has(id)) return;

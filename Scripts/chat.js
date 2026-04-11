@@ -1,4 +1,7 @@
 // chat.js — E2EE text chat module
+// TODO(ux): Add typing indicator (send ephemeral "typing" events over the data channel)
+// TODO(ux): Add read receipts ("seen" acknowledgment messages)
+// TODO(ux): Add message delivery confirmation (sent → delivered → read status)
 
 window.Decengle = window.Decengle || {};
 
@@ -32,6 +35,9 @@ class Chat {
   async send(text) {
     if (!this.currentPeerId || !text.trim()) return;
 
+    // TODO(ux): Support rich media messages (images, files) via data channel chunking
+    // TODO(robustness): Add retry logic if send fails (data channel temporarily closed)
+    // TODO(robustness): Queue messages if data channel isn't open yet, flush on open
     const encrypted = await Decengle.encrypt(this.sharedKey, text.trim());
 
     const msg = {
@@ -50,6 +56,7 @@ class Chat {
   async handleIncoming(fromPeerId, msg) {
     if (msg.type !== "chat-message") return false;
 
+    // TODO(security): Reject messages from peers other than currentPeerId (prevent spoofing)
     let text;
     try {
       text = await Decengle.decrypt(this.sharedKey, msg.encrypted);

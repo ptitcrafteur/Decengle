@@ -1,4 +1,6 @@
 // app.js — Main entry point, wires everything together
+// TODO(robustness): Add global error handler (window.onerror / unhandledrejection) to show user-friendly errors
+// TODO(ux): Add a "text-only mode" option for users who don't want to share video
 
 document.addEventListener("DOMContentLoaded", function () {
 
@@ -38,6 +40,8 @@ function removeCustomBootstrap(url) {
 // Save bootstrap URLs discovered from the network
 function learnBootstrapUrl(url) {
   if (!url || DEFAULT_BOOTSTRAPS.includes(url)) return;
+  // TODO(robustness): Validate URL format and test reachability before saving
+  // TODO(robustness): Expire bootstrap URLs that have been unreachable for N days
   saveCustomBootstrap(url);
 }
 
@@ -342,6 +346,9 @@ async function onMatchEstablished(matchedPeerId) {
   // Set up E2EE chat
   await chat.setPartner(matchedPeerId, privateKey, remotePublicKeyHex);
 
+  // TODO(security): Verify remote peer's identity (public key fingerprint confirmation, e.g. show emoji hash)
+  // TODO(ux): Show connection quality indicator (ping latency, packet loss via WebRTC stats API)
+
   if (localStream) {
     const conn = webrtcManager.connections.get(matchedPeerId);
     if (conn) {
@@ -376,6 +383,9 @@ function onMatchEnded(matchedPeerId) {
 
 // ── Media ──────────────────────────────────────────────────────
 async function startLocalStream() {
+  // TODO(ux): Handle getUserMedia errors gracefully (camera in use, permission denied) with specific messages
+  // TODO(ux): Let users pick video/audio constraints (resolution, frame rate)
+  // TODO(ux): Support screen sharing as an alternative to camera
   localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
   localVideo.srcObject = localStream;
 }
@@ -443,6 +453,8 @@ btnStart.addEventListener("click", async () => {
     console.error("[Decengle] Start error:", err);
     btnStart.disabled = false;
     btnStart.textContent = "Start";
+    // TODO(ux): Show more specific error messages ("Camera access denied", "No bootstrap available", etc.)
+    // TODO(robustness): Clean up partial state (stop localStream if bootstrap fails)
     appendSystemMessage("Failed to connect. Try again.");
   }
 });
@@ -489,6 +501,8 @@ btnStop.addEventListener("click", () => {
 chatForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const text = chatInput.value;
+  // TODO(security): Sanitize chat input to prevent XSS if rendering ever changes from textContent
+  // TODO(ux): Add message length limit with visual feedback
   if (text.trim()) {
     chat.send(text);
     chatInput.value = "";
@@ -496,6 +510,8 @@ chatForm.addEventListener("submit", (e) => {
 });
 
 // ── Boot ───────────────────────────────────────────────────────
+// TODO(networking): Support running without any bootstrap (pure manual peer exchange via QR code / link)
+// TODO(ux): Add "connection stats" debug panel (WebRTC stats, DHT routing table size, etc.)
 init();
 
 }); // end DOMContentLoaded

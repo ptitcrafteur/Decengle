@@ -164,3 +164,11 @@ Decengle/
 ## License
 
 This project is open source. Use it, fork it, run your own node.
+
+---
+
+<!-- TODO(docs): Add a Troubleshooting section (NAT traversal failures, camera permissions, no peers found) -->
+<!-- TODO(docs): Add a Roadmap / Known Limitations section -->
+<!-- TODO(docs): Add deployment guide for production bootstrap nodes (Docker, systemd, reverse proxy with TLS) -->
+<!-- TODO(docs): Document the signaling protocol and DHT message format for third-party clients -->
+<!-- TODO(docs): Add contributing guidelines (CONTRIBUTING.md) -->

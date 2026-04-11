@@ -1,6 +1,10 @@
 // dht.js — Kademlia-inspired DHT running on WebRTC data channels
 // Uses bootstrap WebSocket for initial peer discovery, then operates
 // entirely over the WebRTC mesh.
+// TODO(networking): Implement iterative lookups — recursively query closer peers instead of only K nearest
+// TODO(networking): Add alpha parameter (parallel lookups) for faster convergence per Kademlia spec
+// TODO(networking): Add value republishing — periodically re-store values so they survive beyond 60s TTL
+// TODO(security): Verify that peer IDs match the SHA-256 hash of the claimed public key
 
 window.Decengle = window.Decengle || {};
 
@@ -74,6 +78,7 @@ class DHTNode {
       bucket.push(peerId);
     } else {
       // Bucket full — evict oldest if it's unresponsive
+      // TODO(networking): Ping the oldest peer before evicting — only evict if unresponsive (proper Kademlia)
       // For simplicity, just replace the oldest
       bucket.shift();
       bucket.push(peerId);
@@ -105,6 +110,8 @@ class DHTNode {
 
   // Store a value in the DHT
   put(key, value) {
+    // TODO(security): Validate key format (must be valid 40-char hex)
+    // TODO(security): Enforce max value size to prevent peers from storing huge payloads
     const timestamp = Date.now();
     this.store.set(key, { value, timestamp });
 
@@ -130,6 +137,8 @@ class DHTNode {
     const local = this.store.get(key);
     if (local) return local.value;
 
+    // TODO(networking): Implement iterative lookup — when a peer returns find_node_reply,
+    //   query the returned closer peers until convergence (standard Kademlia FIND_VALUE)
     // Ask closest peers
     return new Promise((resolve) => {
       const closest = this.findClosest(key);
@@ -178,6 +187,8 @@ class DHTNode {
 
   // Find peers that are searching for a match
   async findSearchingPeers() {
+    // TODO(networking): Also query remote peers (find_value) instead of only searching local store
+    //   This would let matching work even if the local DHT is sparse
     const searchers = [];
     // Check local store for peers with state "search"
     for (const [key, entry] of this.store) {

@@ -4,6 +4,10 @@
   box-sizing: border-box;
 }
 
+/* TODO(ux): Add :focus-visible styles for keyboard navigation accessibility */
+/* TODO(ux): Add a prefers-reduced-motion media query to disable the pulse animation */
+/* TODO(ux): Add a light theme option with prefers-color-scheme support */
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: #0a0a0a;
@@ -239,6 +243,8 @@ main {
 }
 
 /* Responsive */
+/* TODO(ux): Add styles for fullscreen video mode (double-click a video to go fullscreen) */
+/* TODO(ux): Add landscape-specific layout for mobile devices */
 @media (max-width: 768px) {
   #video-container {
     flex-direction: column;

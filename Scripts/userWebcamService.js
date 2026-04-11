@@ -1,3 +1,7 @@
+// TODO(cleanup): Remove this file — it is dead code (not loaded in index.html).
+//   Its functionality is duplicated in app.js (startLocalStream). The DOM IDs
+//   (#start, #user-vid) don't match the actual HTML (#btn-start, #local-video).
+
 document.addEventListener("DOMContentLoaded", () => {
   let start = document.getElementById("start");
   let video = document.getElementById("user-vid");

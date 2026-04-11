@@ -4,12 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Decengle</title>
+    <!-- TODO(ux): Add favicon and Open Graph meta tags for link previews -->
+    <!-- TODO(ux): Add a manifest.json for PWA support (offline caching, installable) -->
     <link rel="stylesheet" href="./Style/style.css" />
   </head>
   <body>
     <header>
       <h1>Decengle</h1>
       <div id="status-bar">
+        <!-- TODO(ux): Show bootstrap connection status (connected / offline / reconnecting) -->
+        <!-- TODO(ux): Add a visual indicator for E2EE status (lock icon) -->
         <span id="peer-count">0 peers</span>
         <span id="connection-status" class="status-idle">Idle</span>
       </div>
@@ -20,11 +24,16 @@
         <div class="video-box">
           <video id="local-video" autoplay playsinline muted></video>
           <span class="video-label">You</span>
+          <!-- TODO(ux): Add mute audio / disable video toggle buttons on the local video -->
+          <!-- TODO(ux): Add a camera/mic selector dropdown (for users with multiple devices) -->
         </div>
         <div class="video-box">
           <video id="remote-video" autoplay playsinline></video>
           <span class="video-label">Stranger</span>
+          <!-- TODO(ux): Add volume control for remote audio -->
           <div id="waiting-overlay">
+            <!-- TODO(ux): Add a spinner/animation instead of plain text -->
+            <!-- TODO(ux): Show estimated wait time or number of people searching -->
             <p>Waiting for someone...</p>
           </div>
         </div>
@@ -34,8 +43,13 @@
         <button id="btn-start" class="btn btn-primary">Start</button>
         <button id="btn-next" class="btn btn-warning" disabled>Next</button>
         <button id="btn-stop" class="btn btn-danger" disabled>Stop</button>
+        <!-- TODO(ux): Add a "Report / Block" button visible during a match -->
+        <!-- TODO(ux): Add a "Favorite" button to save the current stranger's peer ID -->
+        <!-- TODO(ux): Add keyboard shortcuts (Esc = Next, Enter in chat = Send) -->
       </div>
 
+      <!-- TODO(ux): Add a typing indicator ("Stranger is typing...") -->
+      <!-- TODO(ux): Add support for sending images / files over the data channel -->
       <div id="chat-container">
         <div id="chat-messages"></div>
         <form id="chat-form">
@@ -50,6 +64,8 @@
         </form>
       </div>
 
+      <!-- TODO(ux): Add a "Connection Info" panel showing peer ID, public key fingerprint, connected peers list -->
+      <!-- TODO(ux): Add a "History" panel showing past conversations from localStorage -->
       <details id="bootstrap-settings">
         <summary>Bootstrap Nodes</summary>
         <div class="bootstrap-add">

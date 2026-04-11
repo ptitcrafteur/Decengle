@@ -1,4 +1,6 @@
 // state.js — Local state management (never shared on DHT)
+// TODO(ux): Add export/import for state (favorites, blocks, history) to backup or transfer between devices
+// TODO(ux): Add statistics tracking (total conversations, total time, average duration)
 
 window.Decengle = window.Decengle || {};
 
@@ -43,6 +45,8 @@ class LocalState {
   }
 
   block(peerId) {
+    // TODO(ux): Store block timestamp so blocks can auto-expire after N days
+    // TODO(ux): Add an optional block reason (for user's own reference)
     if (!this.blocked.includes(peerId)) {
       this.blocked.push(peerId);
       this._save("decengle_blocked", this.blocked);
@@ -60,6 +64,8 @@ class LocalState {
 
   addHistory(entry) {
     // entry: { peerId, timestamp, duration }
+    // TODO(ux): Track conversation duration (set startTime on match, compute duration on end)
+    // TODO(ux): Allow deleting individual history entries
     this.history.push(entry);
     // Keep last 100 entries
     if (this.history.length > 100) {

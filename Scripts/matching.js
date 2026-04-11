@@ -1,5 +1,8 @@
 // matching.js — Random matching service
 // Finds a random peer in "search" state and initiates a connection
+// TODO(ux): Add interest tags / topics — users can set interests and prefer peers with matching tags
+// TODO(ux): Add optional language preference for matching
+// TODO(robustness): Add handshake timeout — if match-accept not received within N seconds, retry
 
 window.Decengle = window.Decengle || {};
 
@@ -24,6 +27,7 @@ class MatchingService {
       this._tryMatch();
     }, 2000);
 
+    // TODO(robustness): Add a maximum search duration — notify user after N minutes with no match
     // Also try immediately
     this._tryMatch();
   }
@@ -47,6 +51,8 @@ class MatchingService {
     if (candidates.length === 0) return;
 
     // Pick a random one
+    // TODO(robustness): Prevent matching the same peer twice in quick succession (add cooldown per peer ID)
+    // TODO(robustness): Handle the glare case where both peers send match-request to each other simultaneously
     const match = candidates[Math.floor(Math.random() * candidates.length)];
     this._initiateMatch(match.peerId);
   }
@@ -157,6 +163,7 @@ class MatchingService {
       });
       this.currentMatch = null;
       if (this.onMatchEnded) this.onMatchEnded(fromPeerId);
+      // TODO(ux): Auto-restart searching after match ends (instead of going idle) — make this configurable
       this.localState.setStatus(Decengle.STATE.IDLE);
     }
   }
