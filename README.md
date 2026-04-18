@@ -50,6 +50,10 @@ Decengle is an anonymous video chat platform where you can talk to random strang
 - Once connected to the mesh, the bootstrap is no longer needed
 - Fully configurable — add your own bootstrap nodes from the UI
 - Custom bootstrap URLs persist in `localStorage`
+- Rate limiting and per-IP connection limits to prevent abuse
+- Message schema validation rejects malformed payloads
+- Structured JSON logging with configurable log levels
+- Graceful shutdown on SIGTERM/SIGINT
 
 ### Zero Frontend Dependencies
 - Pure vanilla JavaScript (ES6+), HTML5 and CSS3
@@ -97,6 +101,11 @@ The server starts on port `9000` by default.
 | `PORT` | Server port (default: `9000`) |
 | `SELF_URL` | Public URL to advertise (e.g. `wss://example.com`) |
 | `PEER_BOOTSTRAPS` | Comma-separated URLs of other bootstrap nodes to peer with |
+| `LOG_LEVEL` | Logging verbosity: `debug`, `info`, `warn`, `error` (default: `info`) |
+| `MAX_MESSAGES_PER_SEC` | Max WebSocket messages per second per IP (default: `30`) |
+| `MAX_CONNECTIONS_PER_IP` | Max concurrent connections per IP (default: `5`) |
+| `RATE_LIMIT_BAN_MS` | Temporary ban duration in ms when rate limit is exceeded (default: `60000`) |
+| `MAX_PAYLOAD_BYTES` | Max allowed WebSocket message size in bytes (default: `65536`) |
 
 ### 2. Open the App
 
