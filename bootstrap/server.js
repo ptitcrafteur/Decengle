@@ -1,5 +1,7 @@
 const { WebSocketServer, WebSocket } = require("ws");
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 
 const PORT = process.env.PORT || 9000;
 const SELF_URL = process.env.SELF_URL || null; // e.g. "wss://decengle.example.com"
@@ -92,23 +94,17 @@ const MAX_MESSAGES_PER_SEC = parseInt(process.env.MAX_MESSAGES_PER_SEC, 10) || 3
 const MAX_CONNECTIONS_PER_IP = parseInt(process.env.MAX_CONNECTIONS_PER_IP, 10) || 5;
 const RATE_LIMIT_BAN_MS = parseInt(process.env.RATE_LIMIT_BAN_MS, 10) || 60000;
 
-// Map<ip, { tokens, lastRefill, bannedUntil }>
-const rateLimiters = new Map();
 // Map<ip, number> — active connection count per IP
 const connectionsPerIp = new Map();
 
-function getRateLimiter(ip) {
-  let rl = rateLimiters.get(ip);
-  if (!rl) {
-    rl = { tokens: MAX_MESSAGES_PER_SEC, lastRefill: Date.now(), bannedUntil: 0 };
-    rateLimiters.set(ip, rl);
-  }
-  return rl;
+/** Attach a per-connection token-bucket to a WebSocket instance. */
+function initConnectionRateLimiter(ws) {
+  ws._rl = { tokens: MAX_MESSAGES_PER_SEC, lastRefill: Date.now(), bannedUntil: 0 };
 }
 
 /** Returns true if the message is allowed, false if rate-limited. */
-function consumeToken(ip) {
-  const rl = getRateLimiter(ip);
+function consumeToken(ws, ip) {
+  const rl = ws._rl;
   const now = Date.now();
 
   if (now < rl.bannedUntil) return false;
@@ -119,9 +115,8 @@ function consumeToken(ip) {
   rl.lastRefill = now;
 
   if (rl.tokens < 1) {
-    // Temporarily ban this IP
     rl.bannedUntil = now + RATE_LIMIT_BAN_MS;
-    log("warn", "ratelimit", "IP exceeded message rate — temporarily banned", { ip, maxPerSec: MAX_MESSAGES_PER_SEC, banSec: RATE_LIMIT_BAN_MS / 1000 });
+    log("warn", "ratelimit", "connection exceeded message rate — temporarily banned", { ip, maxPerSec: MAX_MESSAGES_PER_SEC, banSec: RATE_LIMIT_BAN_MS / 1000 });
     return false;
   }
 
@@ -129,15 +124,7 @@ function consumeToken(ip) {
   return true;
 }
 
-// Clean up stale rate-limiter entries every 2 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, rl] of rateLimiters) {
-    if (now > rl.bannedUntil && rl.tokens >= MAX_MESSAGES_PER_SEC && !connectionsPerIp.has(ip)) {
-      rateLimiters.delete(ip);
-    }
-  }
-}, 120000);
+// (per-connection rate limiters are garbage-collected when the ws object is closed)
 
 const wss = new WebSocketServer({ port: PORT });
 
@@ -149,11 +136,123 @@ log("info", "bootstrap", "Server starting", { id: bootstrapId, port: PORT, selfU
 const peers = new Map();
 
 // ── DHT store ──────────────────────────────────────────────────
+const DHT_MAX_ENTRIES = parseInt(process.env.DHT_MAX_ENTRIES, 10) || 10000;
+const DHT_ENTRY_TTL_MS = parseInt(process.env.DHT_ENTRY_TTL_MS, 10) || 60000;
+const DHT_PERSIST_PATH = process.env.DHT_PERSIST_PATH || path.join(__dirname, "dht-store.json");
+const DHT_PERSIST_DEBOUNCE_MS = parseInt(process.env.DHT_PERSIST_DEBOUNCE_MS, 10) || 1000;
+// TODO(robustness): Switch DHT persistence to SQLite (WAL mode) for better high-write performance.
 const dhtStore = new Map();
-// TODO(security): Add a max size cap for dhtStore (e.g. 10,000 entries) to prevent memory exhaustion
-// TODO(robustness): Persist DHT store to disk (e.g. SQLite) so data survives server restarts
+let dhtDirty = false;
+let dhtPersistTimer = null;
 
-dhtStore.set(bootstrapId, {
+function scheduleDhtPersist() {
+  dhtDirty = true;
+  if (dhtPersistTimer) return;
+
+  dhtPersistTimer = setTimeout(() => {
+    dhtPersistTimer = null;
+    persistDhtStoreToDisk();
+  }, DHT_PERSIST_DEBOUNCE_MS);
+  dhtPersistTimer.unref?.();
+}
+
+function persistDhtStoreToDisk() {
+  if (!dhtDirty) return;
+
+  const entries = [];
+  for (const [key, entry] of dhtStore) {
+    entries.push({ key, value: entry.value, timestamp: entry.timestamp });
+  }
+
+  try {
+    const tmpPath = `${DHT_PERSIST_PATH}.tmp`;
+    fs.writeFileSync(tmpPath, JSON.stringify({ savedAt: Date.now(), entries }));
+    fs.renameSync(tmpPath, DHT_PERSIST_PATH);
+    dhtDirty = false;
+    log("debug", "dht", "Persisted DHT store to disk", { path: DHT_PERSIST_PATH, count: entries.length });
+  } catch (err) {
+    log("error", "dht", "Failed to persist DHT store to disk", { path: DHT_PERSIST_PATH, error: err?.message || String(err) });
+  }
+}
+
+function loadDhtStoreFromDisk() {
+  try {
+    if (!fs.existsSync(DHT_PERSIST_PATH)) return;
+
+    const raw = fs.readFileSync(DHT_PERSIST_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.entries)) return;
+
+    const now = Date.now();
+    for (const item of parsed.entries) {
+      if (!item || typeof item.key !== "string") continue;
+      const timestamp = typeof item.timestamp === "number" ? item.timestamp : now;
+      if (now - timestamp > DHT_ENTRY_TTL_MS) continue;
+      dhtStore.set(item.key, { value: item.value, timestamp });
+      if (dhtStore.size >= DHT_MAX_ENTRIES) break;
+    }
+
+    log("info", "dht", "Loaded DHT store from disk", { path: DHT_PERSIST_PATH, count: dhtStore.size });
+  } catch (err) {
+    log("error", "dht", "Failed to load DHT store from disk", { path: DHT_PERSIST_PATH, error: err?.message || String(err) });
+  }
+}
+
+function dhtDelete(key) {
+  const deleted = dhtStore.delete(key);
+  if (deleted) scheduleDhtPersist();
+  return deleted;
+}
+
+/** Inserts or updates a DHT entry, enforcing the max-size cap.
+ *  Protects currently connected peers from eviction.
+ *  When full, prefers evicting stale entries, then oldest offline entries. */
+function dhtSet(key, entry) {
+  if (!dhtStore.has(key) && dhtStore.size >= DHT_MAX_ENTRIES) {
+    const now = Date.now();
+
+    // Never evict the bootstrap identity or currently connected peers.
+    const evictable = [];
+    for (const [k, e] of dhtStore) {
+      if (k === bootstrapId) continue;
+      if (peers.has(k)) continue;
+      evictable.push([k, e]);
+    }
+
+    if (evictable.length === 0) {
+      log("warn", "dht", "DHT store at capacity, insert dropped (all entries protected)", { key, cap: DHT_MAX_ENTRIES });
+      return false;
+    }
+
+    const stale = evictable.filter(([, e]) => (now - e.timestamp) > DHT_ENTRY_TTL_MS);
+    const candidates = stale.length > 0 ? stale : evictable;
+
+    let oldestKey = null;
+    let oldestTs = Infinity;
+    for (const [k, e] of candidates) {
+      if (e.timestamp < oldestTs) {
+        oldestTs = e.timestamp;
+        oldestKey = k;
+      }
+    }
+
+    if (oldestKey !== null) {
+      dhtDelete(oldestKey);
+      log("warn", "dht", "DHT store at capacity, evicted entry", {
+        evicted: oldestKey,
+        staleEviction: stale.length > 0,
+        cap: DHT_MAX_ENTRIES,
+      });
+    }
+  }
+  dhtStore.set(key, entry);
+  scheduleDhtPersist();
+  return true;
+}
+
+loadDhtStoreFromDisk();
+
+dhtSet(bootstrapId, {
   value: { peerId: bootstrapId, state: "idle", lastSeen: Date.now() },
   timestamp: Date.now(),
 });
@@ -167,8 +266,8 @@ if (SELF_URL) knownBootstraps.add(SELF_URL);
 setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of dhtStore) {
-    if (now - entry.timestamp > 60000) {
-      dhtStore.delete(key);
+    if (now - entry.timestamp > DHT_ENTRY_TTL_MS) {
+      dhtDelete(key);
     }
   }
 }, 15000);
@@ -221,7 +320,7 @@ function connectToBootstrapPeer(url) {
         for (const entry of msg.entries) {
           const existing = dhtStore.get(entry.key);
           if (!existing || existing.timestamp < entry.timestamp) {
-            dhtStore.set(entry.key, { value: entry.value, timestamp: entry.timestamp });
+            dhtSet(entry.key, { value: entry.value, timestamp: entry.timestamp });
           }
         }
         log("debug", "federation", "Synced DHT entries from peer bootstrap", { url, count: msg.entries.length });
@@ -284,6 +383,7 @@ wss.on("connection", (ws, req) => {
     return;
   }
   connectionsPerIp.set(ip, connCount);
+  initConnectionRateLimiter(ws);
   ws.on("close", () => {
     const c = (connectionsPerIp.get(ip) || 1) - 1;
     if (c <= 0) connectionsPerIp.delete(ip); else connectionsPerIp.set(ip, c);
@@ -293,7 +393,7 @@ wss.on("connection", (ws, req) => {
 
   ws.on("message", (raw) => {
     // ── Per-IP message rate limit ────────────────────────────────
-    if (!consumeToken(ip)) {
+    if (!consumeToken(ws, ip)) {
       ws.close(1008, "Rate limit exceeded");
       return;
     }
@@ -330,7 +430,7 @@ wss.on("connection", (ws, req) => {
           connectToBootstrapPeer(msg.bootstrapUrl);
         }
 
-        dhtStore.set(peerId, {
+        dhtSet(peerId, {
           value: {
             peerId,
             publicKey: msg.publicKey,
@@ -373,7 +473,7 @@ wss.on("connection", (ws, req) => {
         // TODO(security): Validate that msg.key matches the peer's actual ID to prevent impersonation
         // TODO(security): Limit value size (e.g. max 1KB) to prevent storage abuse
         if (msg.key && msg.value !== undefined) {
-          dhtStore.set(msg.key, {
+          dhtSet(msg.key, {
             value: msg.value,
             timestamp: msg.timestamp || Date.now(),
           });
@@ -438,7 +538,7 @@ wss.on("connection", (ws, req) => {
 function removePeer(id) {
   if (!id || !peers.has(id)) return;
   peers.delete(id);
-  dhtStore.delete(id);
+  dhtDelete(id);
   log("info", "peer", "Peer left", { peerId: id.slice(0, 12), totalPeers: peers.size });
   broadcast(id, JSON.stringify({ type: "peer-left", peerId: id }));
 }
@@ -454,6 +554,12 @@ function broadcast(excludeId, data) {
 // ── Graceful shutdown ─────────────────────────────────────────
 function shutdown(signal) {
   log("info", "bootstrap", "Shutdown signal received, closing gracefully", { signal });
+
+  if (dhtPersistTimer) {
+    clearTimeout(dhtPersistTimer);
+    dhtPersistTimer = null;
+  }
+  persistDhtStoreToDisk();
 
   // Stop accepting new connections
   wss.close(() => {
