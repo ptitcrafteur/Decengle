@@ -35,7 +35,8 @@ Decengle is an anonymous video chat platform where you can talk to random strang
 - Fully distributed peer discovery running on WebRTC data channels
 - 160-bit peer IDs derived from SHA-256 of each peer's public key
 - Peers announce their state (`idle`, `search`, `busy`) into the DHT
-- DHT entries auto-expire after 60 seconds to keep the network fresh
+- DHT entries auto-expire (default: 60 seconds) to keep the network fresh
+- Bootstrap DHT store is size-capped (default: 10,000 entries) with stale/offline-first eviction
 - Data replicated across the K closest peers for resilience
 
 ### Random Matching
@@ -50,8 +51,9 @@ Decengle is an anonymous video chat platform where you can talk to random strang
 - Once connected to the mesh, the bootstrap is no longer needed
 - Fully configurable — add your own bootstrap nodes from the UI
 - Custom bootstrap URLs persist in `localStorage`
-- Rate limiting and per-IP connection limits to prevent abuse
+- Per-connection message rate limiting and per-IP connection limits to prevent abuse
 - Message schema validation rejects malformed payloads
+- DHT persistence to disk across restarts (JSON file, configurable path)
 - Structured JSON logging with configurable log levels
 - Graceful shutdown on SIGTERM/SIGINT
 
@@ -102,10 +104,14 @@ The server starts on port `9000` by default.
 | `SELF_URL` | Public URL to advertise (e.g. `wss://example.com`) |
 | `PEER_BOOTSTRAPS` | Comma-separated URLs of other bootstrap nodes to peer with |
 | `LOG_LEVEL` | Logging verbosity: `debug`, `info`, `warn`, `error` (default: `info`) |
-| `MAX_MESSAGES_PER_SEC` | Max WebSocket messages per second per IP (default: `30`) |
+| `MAX_MESSAGES_PER_SEC` | Max WebSocket messages per second per connection (default: `30`) |
 | `MAX_CONNECTIONS_PER_IP` | Max concurrent connections per IP (default: `5`) |
 | `RATE_LIMIT_BAN_MS` | Temporary ban duration in ms when rate limit is exceeded (default: `60000`) |
 | `MAX_PAYLOAD_BYTES` | Max allowed WebSocket message size in bytes (default: `65536`) |
+| `DHT_MAX_ENTRIES` | Max DHT entries kept in bootstrap memory (default: `10000`) |
+| `DHT_ENTRY_TTL_MS` | DHT entry TTL in ms before cleanup/expiry (default: `60000`) |
+| `DHT_PERSIST_PATH` | JSON file path used to persist bootstrap DHT data (default: `bootstrap/dht-store.json`) |
+| `DHT_PERSIST_DEBOUNCE_MS` | Debounce interval for DHT disk writes in ms (default: `1000`) |
 
 ### 2. Open the App
 
@@ -143,7 +149,7 @@ Open `index.html` in your browser. That's it — no build step required.
 | Networking | WebRTC (media + data channels) |
 | Peer Discovery | Kademlia DHT over WebRTC |
 | Bootstrap Server | Node.js + `ws` |
-| Storage | Browser `localStorage` |
+| Storage | Browser `localStorage`, bootstrap JSON file persistence |
 
 ---
 
